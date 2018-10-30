@@ -131,7 +131,7 @@ public class Snippetizer implements RootAction, DescriptorByNameOwner {
                 if (d.isMetaStep()) {
                     // if we have a symbol name for the wrapped Describable, we can produce
                     // a more concise form that hides it
-                    DescribableModel<?> m = new DescribableModel(d.clazz);
+                    DescribableModel<?> m = DescribableModel.of(d.clazz);
                     DescribableParameter p = m.getFirstRequiredParameter();
                     if (p!=null) {
                         Object wrapped = uninst.getArguments().get(p.getName());
@@ -380,7 +380,7 @@ public class Snippetizer implements RootAction, DescriptorByNameOwner {
             if (d.isAdvanced() == advanced) {
                 t.add(new QuasiDescriptor(d));
                 if (d.isMetaStep()) {
-                    DescribableModel<?> m = new DescribableModel(d.clazz);
+                    DescribableModel<?> m = DescribableModel.of(d.clazz);
                     Collection<DescribableParameter> parameters = m.getParameters();
                     if (parameters.size() == 1) {
                         DescribableParameter delegate = parameters.iterator().next();
@@ -487,7 +487,7 @@ public class Snippetizer implements RootAction, DescriptorByNameOwner {
                 // Look for a metastep which could take this as its delegate.
                 for (StepDescriptor d : StepDescriptor.allMeta()) {
                     if (d.getMetaStepArgumentType().isInstance(o)) {
-                        DescribableModel<?> m = new DescribableModel(d.clazz);
+                        DescribableModel<?> m = DescribableModel.of(d.clazz);
                         DescribableParameter soleRequiredParameter = m.getSoleRequiredParameter();
                         if (soleRequiredParameter != null) {
                             step = d.newInstance(Collections.singletonMap(soleRequiredParameter.getName(), o));

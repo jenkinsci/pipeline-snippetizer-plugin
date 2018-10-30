@@ -8,9 +8,12 @@ import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
 import groovy.util.DelegatingScript;
 import hudson.model.Describable;
+import hudson.model.Queue;
+import hudson.tasks.junit.TestDataPublisher;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.jenkinsci.plugins.structs.describable.*;
-//import org.jenkinsci.plugins.workflow.cps.Snippetizer;
+import org.jenkinsci.plugins.workflow.flow.FlowExecution;
+import org.jenkinsci.plugins.workflow.flow.FlowExecutionOwner;
 import org.jenkinsci.plugins.workflow.steps.Step;
 import org.jenkinsci.plugins.workflow.steps.StepDescriptor;
 import org.jenkinsci.plugins.workflow.util.StaplerReferer;
@@ -18,6 +21,8 @@ import org.jvnet.hudson.test.JenkinsRule;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
+import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,12 +48,9 @@ public class SnippetizerTester {
     /**
      * Tests a form submitting part of snippetizer.
      *
-     * @param json
-     *      The form submission value from the configuration page to be tested.
-     * @param responseText
-     *      Expected snippet to be generated
-     * @param referer
-     *      needed because of {@link StaplerReferer}
+     * @param json         The form submission value from the configuration page to be tested.
+     * @param responseText Expected snippet to be generated
+     * @param referer      needed because of {@link StaplerReferer}
      */
     public void assertGenerateSnippet(@Nonnull String json, @Nonnull String responseText, @CheckForNull String referer) throws Exception {
         JenkinsRule.WebClient wc = r.createWebClient();
@@ -73,46 +75,47 @@ public class SnippetizerTester {
      * As an additional measure, this method also executes the generated snippet and makes sure
      * it yields identical {@link Step} object.
      *
-     * @param step
-     *      A fully configured step object
-     * @param expected
-     *      Expected snippet to be generated.
+     * @param step     A fully configured step object
+     * @param expected Expected snippet to be generated.
      */
 
     public void assertRoundTrip(Step step, String expected) throws Exception {
         assertEquals(expected, Snippetizer.step2Groovy(step));
-//        CompilerConfiguration cc = new CompilerConfiguration();
-//        cc.setScriptBaseClass(DelegatingScript.class.getName());
-//        GroovyShell shell = new GroovyShell(r.jenkins.getPluginManager().uberClassLoader,new Binding(),cc);
-//
-//        DelegatingScript s = (DelegatingScript) shell.parse(expected);
-//        s.o = new DSL(new DummyOwner()) {
-          //for testing, instead of executing the step just return an instantiated Step
-//            @Override
-//            protected Object invokeStep(StepDescriptor d, String name, Object args) {
-//                try {
-//                    return d.newInstance(parseArgs(args, d).namedArgs);
-//                } catch (Exception e) {
-//                    throw new AssertionError(e);
-//                }
-//            }
-//        };
-//
-//        Step actual = (Step) s.run();
-//        r.assertEqualDataBoundBeans(step, actual);
+        CompilerConfiguration cc = new CompilerConfiguration();
+        cc.setScriptBaseClass(DelegatingScript.class.getName());
+        GroovyShell shell = new GroovyShell(r.jenkins.getPluginManager().uberClassLoader, new Binding(), cc);
+
+        DelegatingScript s = (DelegatingScript) shell.parse(expected);
+
+        Object delegate = new DSL(new DummyOwner()) {
+            //for testing, instead of executing the step just return an instantiated Step
+            @Override
+            protected Object invokeStep(StepDescriptor d, String name, Object args) {
+                try {
+                    return d.newInstance(parseArgs(args, d).namedArgs);
+                } catch (Exception e) {
+                    throw new AssertionError(e);
+                }
+            }
+        };
+
+//        ((MyDSL) delegate).sd = step.getDescriptor();
+        s.setDelegate(delegate);
+
+
+        Step actual = (Step) s.run();
+        r.assertEqualDataBoundBeans(step, actual);
     }
 
     /**
      * Recurses through the model of a {@link Describable} class's {@link DescribableModel} and its parameters to verify that doc generation will work.
      *
-     * @param describableClass
-     *     A {@link Class} implementing {@link Describable}
-     * @throws Exception
-     *     If any errors are encountered.
+     * @param describableClass A {@link Class} implementing {@link Describable}
+     * @throws Exception If any errors are encountered.
      */
     @SuppressWarnings("unchecked")
     public static void assertDocGeneration(Class<? extends Describable> describableClass) throws Exception {
-        DescribableModel<?> model = new DescribableModel(describableClass);
+        DescribableModel<?> model = DescribableModel.of(describableClass);
 
         assertNotNull(model);
 
@@ -121,15 +124,15 @@ public class SnippetizerTester {
     }
 
     private static void recurseOnTypes(DescribableModel<?> model, ParameterType type) throws Exception {
-//        System.out.println("Model "+ model);
-//        System.out.println("Type  "+ type.getClass().getName());
+        System.out.println("type "+ type);
         if (type instanceof ErrorType) {
-            //@TODO: Why is failing with JUnitResultArchiver
-//            throw new Exception("could not describe " + model, ((ErrorType) type).getError());
+            throw new Exception("could not describe " + model, ((ErrorType) type).getError());
         }
 
         if (type instanceof ArrayType) {
-            recurseOnTypes(model, ((ArrayType)type).getElementType());
+//            System.out.println(" Actual Type "+ type.getActualType());
+//            System.out.println(" Actual Type "+ ((ArrayType) type).getElementType());
+            recurseOnTypes(model, ((ArrayType) type).getElementType());
         } else if (type instanceof HomogeneousObjectType) {
             recurseOnModel(((HomogeneousObjectType) type).getSchemaType());
         } else if (type instanceof HeterogeneousObjectType) {
@@ -138,7 +141,6 @@ public class SnippetizerTester {
                 System.err.println("Ignoring " + model.getType().getName() + " since a parameter is not enumerable");
                 return;
             }
-//            System.out.println("Heterogeneous " + type);
             for (Map.Entry<String, DescribableModel<?>> entry : ((HeterogeneousObjectType) type).getTypes().entrySet()) {
                 recurseOnModel(entry.getValue());
             }
@@ -146,8 +148,44 @@ public class SnippetizerTester {
     }
 
     private static void recurseOnModel(DescribableModel<?> model) throws Exception {
+        System.out.println("Model "+ model);
         for (DescribableParameter param : model.getParameters()) {
             recurseOnTypes(model, param.getType());
+        }
+    }
+
+    private static class DummyOwner extends FlowExecutionOwner {
+        DummyOwner() {
+        }
+
+        @Override
+        public FlowExecution get() throws IOException {
+            return null;
+        }
+
+        @Override
+        public File getRootDir() throws IOException {
+            throw new IOException("not implemented");
+        }
+
+        @Override
+        public Queue.Executable getExecutable() throws IOException {
+            throw new IOException("not implemented");
+        }
+
+        @Override
+        public String getUrl() throws IOException {
+            throw new IOException("not implemented");
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            return 0;
         }
     }
 }

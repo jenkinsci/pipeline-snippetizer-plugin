@@ -35,6 +35,7 @@ import hudson.model.Result;
 import hudson.tasks.ArtifactArchiver;
 import org.jenkinsci.Symbol;
 import org.jenkinsci.plugins.structs.describable.DescribableModel;
+import org.jenkinsci.plugins.workflow.cps.steps.ParallelStep;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.jenkinsci.plugins.workflow.steps.*;
 import org.jenkinsci.plugins.workflow.support.steps.ExecutorStep;
@@ -42,12 +43,12 @@ import org.jenkinsci.plugins.workflow.support.steps.WorkspaceStep;
 import org.jenkinsci.plugins.workflow.support.steps.build.BuildTriggerStep;
 import org.jenkinsci.plugins.workflow.support.steps.input.InputStep;
 import org.jenkinsci.plugins.workflow.testMetaStep.*;
-import org.jenkinsci.plugins.workflow.testMetaStep.*;
 import org.jenkinsci.plugins.workflow.testMetaStep.chemical.CarbonMonoxide;
 import org.jenkinsci.plugins.workflow.testMetaStep.chemical.DetectionMetaStep;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.jvnet.hudson.test.*;
+import org.kohsuke.stapler.NoStaplerConstructorException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,8 +58,6 @@ import java.util.logging.Level;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.not;
 import static org.junit.Assert.assertThat;
-
-//import org.jenkinsci.plugins.workflow.cps.steps.ParallelStep;
 
 // TODO these tests would better be moved to the respective plugins
 
@@ -217,7 +216,6 @@ public class SnippetizerTest {
     @Test public void doDslRef() throws Exception {
         JenkinsRule.WebClient wc = r.createWebClient();
         String html = wc.goTo(Snippetizer.ACTION_URL + "/html").getWebResponse().getContentAsString();
-//        assertThat("text from LoadStep/help-path.html is included", html, containsString("the Groovy file to load"));
         assertThat("GitSCM.submoduleCfg is mentioned as an attribute of a value of GenericSCMStep.scm", html, containsString("submoduleCfg"));
         assertThat("CleanBeforeCheckout is mentioned as an option", html, containsString("CleanBeforeCheckout"));
         assertThat("content is written to the end", html, containsString("</body></html>"));
@@ -326,10 +324,10 @@ public class SnippetizerTest {
     /**
      * An example of a step that will fail to generate docs correctly due to a lack of a {@link org.kohsuke.stapler.DataBoundConstructor}.
      */
-//    @Test(expected = NoStaplerConstructorException.class)
-//    public void parallelStepDocs() throws Exception {
-//        SnippetizerTester.assertDocGeneration(ParallelStep.class);
-//    }
+    @Test(expected = NoStaplerConstructorException.class)
+    public void parallelStepDocs() throws Exception {
+        SnippetizerTester.assertDocGeneration(ParallelStep.class);
+    }
 
 
     @Issue("JENKINS-31967")
