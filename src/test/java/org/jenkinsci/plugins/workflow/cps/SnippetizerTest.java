@@ -342,17 +342,18 @@ public class SnippetizerTest {
     public void snippetizerLinks() throws Exception {
         WorkflowJob job = r.jenkins.createProject(WorkflowJob.class, "p");
         JenkinsRule.WebClient wc = r.createWebClient();
-        String html = wc.getPage(job, Snippetizer.ACTION_URL).getWebResponse().getContentAsString();
+//        String html = wc.getPage(job, Snippetizer.ACTION_URL).getWebResponse().getContentAsString();
+        String html = wc.goTo(Snippetizer.ACTION_URL).getWebResponse().getContentAsString();
         assertThat("Snippet Generator link is included", html,
-                containsString("href=\"" + r.contextPath + "/" + job.getUrl() + Snippetizer.ACTION_URL + "\""));
+                containsString("href=\"" + r.contextPath + "/" + Snippetizer.ACTION_URL + "\""));
         assertThat("Steps Reference link is included", html,
-                containsString("href=\"" + r.contextPath + "/" + job.getUrl() + Snippetizer.ACTION_URL + "/html\""));
+                containsString("href=\"" + r.contextPath + "/" + Snippetizer.ACTION_URL + "/html\""));
 //        assertThat("Globals Reference link is included", html,
 //                containsString("href=\"" + r.contextPath + "/" + job.getUrl() + Snippetizer.ACTION_URL + "/globals\""));
         assertThat("Online docs link is included", html,
                 containsString("href=\"https://jenkins.io/doc/pipeline/\""));
         assertThat("GDSL link is included", html,
-                containsString("href=\"" + r.contextPath + "/" + job.getUrl() + Snippetizer.ACTION_URL + "/gdsl\""));
+                containsString("href=\"" + r.contextPath + "/"  + Snippetizer.ACTION_URL + "/gdsl\""));
 
         // Now verify that the links are still present and correct when we're not within a job.
         String rootHtml = wc.goTo(Snippetizer.ACTION_URL).getWebResponse().getContentAsString();

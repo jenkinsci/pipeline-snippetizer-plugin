@@ -357,7 +357,7 @@ public class Snippetizer implements RootAction, DescriptorByNameOwner {
     public static final String ACTION_URL = "pipeline-syntax";
 
     @Override public String getUrlName() {
-        return ACTION_URL;
+        return "/"+ACTION_URL;
     }
 
     @Override public String getIconFileName() {
